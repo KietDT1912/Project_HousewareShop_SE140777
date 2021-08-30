@@ -1,11 +1,7 @@
 package com.example.housewareshop.controller;
 
-import com.example.housewareshop.entity.Cart;
-import com.example.housewareshop.entity.Category;
-import com.example.housewareshop.entity.Image;
-import com.example.housewareshop.entity.Product;
-import com.example.housewareshop.repository.CategoryRepository;
-import com.example.housewareshop.repository.ProductRepository;
+import com.example.housewareshop.entity.*;
+import com.example.housewareshop.repository.*;
 import com.example.housewareshop.util.MathFunction;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
@@ -18,8 +14,11 @@ import org.springframework.web.bind.annotation.RequestParam;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpSession;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.List;
+import java.util.logging.SimpleFormatter;
 
 @Controller
 public class mainController {
@@ -29,6 +28,15 @@ public class mainController {
 
     @Autowired
     CategoryRepository categoryRepository;
+
+    @Autowired
+    ShippingRepository shippingRepository;
+
+    @Autowired
+    OrderDetailRepository orderDetailRepository;
+
+    @Autowired
+    OrderRepository orderRepository;
 
     @GetMapping({"/"})
     public String index(){
@@ -213,6 +221,64 @@ public class mainController {
         model.addAttribute("phone",phone);
         model.addAttribute("address",address);
         model.addAttribute("note",note);
+        return "prepareShipping";
+    }
+
+    @PostMapping("/prepare-shipping")
+    public String postPrepareShipping(Model model,
+                                  @RequestParam(name = "name")String name,
+                                  @RequestParam(name = "phone")String phone,
+                                  @RequestParam(name = "address")String address,
+                                  @RequestParam(name = "note")String note,
+                                  HttpSession session){
+
+        List<Cart> listCart = (List<Cart>) session.getAttribute("listCart");
+        if(listCart == null || listCart.size() == 0){
+            return "emptyCart";
+        }
+
+        double totalMoney = 0;
+        for(Cart c: listCart){
+            totalMoney += c.getProductPrice()*c.getQuantity();
+        }
+
+        // Save to Database
+        // Shipping save
+        Shipping shipping = new Shipping();
+        shipping.setName(name);
+        shipping.setPhone(phone);
+        shipping.setAddress(address);
+        shipping = shippingRepository.save(shipping);
+
+        // Order save
+        Order order = new Order();
+        order.setNote(note);
+        order.setTotalPrice(totalMoney);
+
+        Date now = new Date();
+        SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
+        order.setCreatedDate(java.sql.Date.valueOf(sdf.format(now)));
+
+        order.setShipping(shipping);
+
+        StatusOrder statusOrder = new StatusOrder();
+        statusOrder.setId(1);
+        order.setStatus(statusOrder);
+
+        order = orderRepository.save(order);
+
+        // Order detail save
+        for (Cart cart: listCart) {
+            OrderDetail orderDetail = new OrderDetail();
+            orderDetail.setOrder(order);
+            orderDetail.setQuantity(cart.getQuantity());
+            orderDetail.setProductName(cart.getProductName());
+            orderDetail.setProductPrice(cart.getProductPrice());
+            orderDetail.setProductImage(cart.getProductImageUrl());
+
+            orderDetailRepository.save(orderDetail);
+        }
+
         return "prepareShipping";
     }
 
