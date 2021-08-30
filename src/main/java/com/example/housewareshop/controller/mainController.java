@@ -43,6 +43,11 @@ public class mainController {
         return "home";
     }
 
+    @GetMapping({"/hello"})
+    public String hello(){
+        return "hello";
+    }
+
     @GetMapping("/products")
     public String getListProducts(Model model,
                                   @RequestParam(name = "page", defaultValue = "1")Integer page,
